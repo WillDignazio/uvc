@@ -34,7 +34,6 @@ struct arguments
 static error_t
 parse_opt (int key, char *arg, struct argp_state *state)
 {
-  int portnum;
   struct arguments *arguments = (struct arguments*)state->input;
   
   switch (key) {
@@ -91,29 +90,18 @@ int main(int argc, char *argv[])
   cout << payload << endl;
 
   try {
-    UVBSocket sock(string(arguments.args[0]),
-		   string(arguments.portstr),
-		   payload);
-
-    /* Setup poll... */
-    struct pollfd pfd = { sock.socket_fd(), POLLIN, 0 };
-    auto ts = chrono::high_resolution_clock::now();    
-
-    for (int idx=0; idx < 1000; ++idx) {
-      sock.emit_payload();
-      
-      auto ts1 = chrono::high_resolution_clock::now();
-      int res = poll(&pfd,1, 1000 * 100);
-      if (res < 1) {
-	cerr << "poll failure: " << string(strerror(errno)) << endl;
-      }
-      auto te1 = chrono::high_resolution_clock::now();
-      cout << "Poll: " << chrono::duration_cast<chrono::milliseconds>(te1 - ts1).count() << "ms" << endl;
-      
-      sock.recv_message();
+    vector<shared_ptr<UVBSocket>> sockets;
+    for (int idx=0; idx < 200; ++idx) {
+      shared_ptr<UVBSocket> sock = make_shared<UVBSocket>(string(arguments.args[0]),
+							  string(arguments.portstr),
+							  payload);
+      sockets.push_back(sock);
+      cout << "Initializing " << idx << endl;
     }
-    auto te = chrono::high_resolution_clock::now();
-    cout << "Took: " << chrono::duration_cast<chrono::milliseconds>(te - ts).count() << "ms" << endl;
+
+    Scheduler sched(sockets);
+    thread* sched_thr = sched.start();
+    sched_thr->join();
     
   } catch (const exception &exc) {
     cerr << "ERROR: "  << exc.what() << endl;

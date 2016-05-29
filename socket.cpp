@@ -14,7 +14,9 @@ UVBSocket::UVBSocket(const string _host,
 		     const string& _payload):
     host {_host},
     portstr {_portstr},
-    payload {_payload}
+    payload {_payload},
+    state {WRITE},
+    buffer {new char[100]}
   {
     memset(&host_info_in, 0, sizeof host_info_in);
     host_info_in.ai_family = AF_UNSPEC;
@@ -53,7 +55,13 @@ UVBSocket::~UVBSocket()
   if (status != 0) {
     cerr << "Destruction error: " << strerror(errno) << endl;
     throw "Failed to close socket";
-  }        
+  }
+
+  if (host_info_ret != NULL)
+    free(host_info_ret);
+
+  delete buffer;
+  cout << "Closed UVBSocket" << endl;
 }
 
 int UVBSocket::socket_fd()
@@ -61,12 +69,19 @@ int UVBSocket::socket_fd()
   return socketfd;
 }
 
+opstate UVBSocket::socket_state()
+{
+  return state;
+}
+
 int UVBSocket::emit_payload()
-{  
-  return send(socketfd, payload.c_str(), payload.length(), 0);  
+{
+  state = READ;
+  return send(socketfd, payload.c_str(), payload.length(), 0);
 }
 
 int UVBSocket::recv_message()
 {
-  return recv(socketfd, buffer, 1000, 0);
+  state = WRITE;
+  return recv(socketfd, buffer, 100, 0);
 }

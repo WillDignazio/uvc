@@ -8,8 +8,17 @@
 #include <queue>
 #include <mutex>
 #include <memory>
+#include <thread>
+#include <poll.h>
+#include <condition_variable>
 
 using namespace std;
+
+enum opstate {
+  READ,
+  WRITE,
+  SHUTDOWN
+};
 
 class UVBSocket
 {
@@ -21,9 +30,10 @@ private:
   struct addrinfo host_info_in;
   struct addrinfo *host_info_ret;  
   int socketfd;
+  opstate state;
 
   /* TODO: remove or share */
-  char buffer[100];
+  char *buffer;
   
 public:
   UVBSocket(const string _host, const string _portstr, const string& _payload);
@@ -33,6 +43,7 @@ public:
   int recv_message();
 
   int socket_fd();
+  opstate socket_state();
 };
 
 
@@ -40,27 +51,34 @@ public:
  * Scheduler class
  * sched.cpp
  */
+using ScheduleOp = tuple<opstate, struct pollfd*, shared_ptr<UVBSocket>>;
 class Scheduler
-{
-  enum sched_op {
-    READ,
-    WRITE
-  };
-  
-private:
-  const vector<UVBSocket*> sockets;
-  const queue<shared_ptr<pair<sched_op, UVBSocket*>>> op_queue;
-
-  mutex sched_lock;
+{ 
+private:  
+  thread event_thread;
   
 public:
-  Scheduler(const vector<UVBSocket*> _sockets);
+  const vector<shared_ptr<UVBSocket>> sockets;
+  vector<thread*> worker_threads;
+  queue<shared_ptr<ScheduleOp>> op_queue;
+  
+  struct pollfd *poll_fds;
+  nfds_t poll_fds_count;
+
+  bool stopped;
+  condition_variable signal;
+  mutex sched_lock; 
+  
+  Scheduler(const vector<shared_ptr<UVBSocket>> _sockets);
   ~Scheduler();
 
   /* Scheduling Operations */
-  void schedule(sched_op op, UVBSocket* socket);
+  int schedule(shared_ptr<ScheduleOp> op);
   void suspend();
   void resume();
+  thread* start();
+
+  bool is_stopped();
 };
 
 /* util.cpp */
