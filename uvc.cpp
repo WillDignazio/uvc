@@ -1,11 +1,13 @@
 #include <iostream>
-#include <cstring>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <unistd.h>
 #include <argp.h>
 #include <thread>
+#include <unistd.h>
+#include <cstring>
 #include <vector>
+#include <chrono>
+
+#include <poll.h>
+#include "uvc.hpp"
 
 using namespace std;
 
@@ -69,106 +71,6 @@ static struct argp argp = {
   doc
 };
 
-const char* REQUEST_TEMPLATE =
-  "GET /%s HTTP/1.1\n" \
-  "Host: %s\n\n";
-
-const string fill_req_template(const char *host, const char *name)
-{
-  if (name == nullptr)
-    throw "Invalid pointer to host or name";
-      
-  int bufsize = strlen(REQUEST_TEMPLATE) - (2) + // replace chars
-    strlen(name) + strlen(host) + 1;
-
-  char buffer[bufsize];
-  snprintf(buffer, sizeof(buffer), REQUEST_TEMPLATE, name, host);
-
-  return string(buffer);
-}
-
-class Endpoint
-{
-private:
-  const string host;
-  const string name;
-  const string portstr;
-
-  string reqstr;
-  struct addrinfo host_info_in;
-  struct addrinfo *host_info_ret;  
-  int socketfd;
-  
-public:
-  Endpoint(const string _host, const string _portstr, const string _name):
-    host {_host},
-    portstr {_portstr},
-    name {_name}
-  {
-    reqstr = fill_req_template(host.c_str(), name.c_str());
-    
-    memset(&host_info_in, 0, sizeof host_info_in);
-    host_info_in.ai_family = AF_UNSPEC;
-    host_info_in.ai_socktype = SOCK_STREAM;
-    
-    int status = getaddrinfo(host.c_str(), portstr.c_str(),
-			     &host_info_in,
-			     &host_info_ret);
-    if (status != 0) {
-      cerr << gai_strerror(status) << endl;
-      exit(1);
-    }
-
-    socketfd = socket(host_info_ret->ai_family,
-		      host_info_ret->ai_socktype,
-		      host_info_ret->ai_protocol);
-    
-    if (socketfd == -1) {
-      cerr << "Failed to open socket" << endl;
-      exit(1);
-    }
-    
-    status = connect(socketfd,
-		     host_info_ret->ai_addr,
-		     host_info_ret->ai_addrlen);
-    if (status != 0) {
-      cerr << "Failed to connect socket" << endl;
-      exit(1);
-    }
-  }
-
-  ~Endpoint()
-  {
-    int status = close(socketfd);
-    if (status != 0) {
-      cerr << "Failed to close socket: " << strerror(errno) << endl;
-    }    
-  }
-
-  void send_request()
-  {
-    int bytes_sent = send(socketfd, reqstr.c_str(), reqstr.length(), 0);
-  }
-
-  void recv_response()
-  {
-    char buffer[1000];
-    int bytes_recv = recv(socketfd, buffer, 1000, 0);
-  }
-};
-
-void thr_fn(Endpoint *ep) {
-  if (ep == nullptr)
-    cerr << "null endpoint" << endl;
-
-  for (int idx=0; idx < 1000; ++idx) {
-    ep->send_request();
-    ep->recv_response();
-  }
-  
-  delete ep;
-}
-
 int main(int argc, char *argv[])
 {
   /* Parse Arguments */
@@ -179,35 +81,43 @@ int main(int argc, char *argv[])
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
   
   cout << "Starting uvc..." << endl;
+  cout << "host: " << arguments.args[0] << endl;
+  cout << "port: " << arguments.portstr << endl;
+  cout << "name: " << arguments.args[1] << endl;
 
-  vector<Endpoint*> endpoints;
+  const string payload = fill_req_template(arguments.args[0], arguments.args[1]);
 
-  for (int idx=0; idx < 10; ++idx) {
-    Endpoint *ep = new Endpoint(arguments.args[0], arguments.portstr, arguments.args[1]);
-    endpoints.push_back(ep);
-    cout << "Adding endpoint" << endl;
+  cout << "Payload:" << endl;
+  cout << payload << endl;
+
+  try {
+    UVBSocket sock(string(arguments.args[0]),
+		   string(arguments.portstr),
+		   payload);
+
+    /* Setup poll... */
+    struct pollfd pfd = { sock.socket_fd(), POLLIN, 0 };
+    auto ts = chrono::high_resolution_clock::now();    
+
+    for (int idx=0; idx < 1000; ++idx) {
+      sock.emit_payload();
+      
+      auto ts1 = chrono::high_resolution_clock::now();
+      int res = poll(&pfd,1, 1000 * 100);
+      if (res < 1) {
+	cerr << "poll failure: " << string(strerror(errno)) << endl;
+      }
+      auto te1 = chrono::high_resolution_clock::now();
+      cout << "Poll: " << chrono::duration_cast<chrono::milliseconds>(te1 - ts1).count() << "ms" << endl;
+      
+      sock.recv_message();
+    }
+    auto te = chrono::high_resolution_clock::now();
+    cout << "Took: " << chrono::duration_cast<chrono::milliseconds>(te - ts).count() << "ms" << endl;
+    
+  } catch (const exception &exc) {
+    cerr << "ERROR: "  << exc.what() << endl;
   }
-  
-  time_t ts;
-  time(&ts);
-
-  vector<thread*> threads;
-  for (auto ep=endpoints.begin(); ep != endpoints.end(); ++ep) {
-    thread *thr = new thread(thr_fn, *ep);
-    threads.push_back(thr);
-    cout << "added thread" << endl;
-  }
-
-  cout << "created threads" << endl;
-  
-  for (auto thr=threads.begin(); thr != threads.end(); ++thr) {
-    (*thr)->join();
-  }
-  
-  time_t te;
-  time(&te);
-
-  cout << "Took: " << (te - ts) << "s" << endl;
 
   return 0;
 }
