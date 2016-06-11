@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <fcntl.h>
+#include <netinet/tcp.h>
 
 #include <iostream>
 using std::cerr;
@@ -53,7 +54,14 @@ UVBSocket::UVBSocket(const string& _host,
       /* Configure Socket */
       status = fcntl(socketfd, F_SETFL, O_NONBLOCK);
       if (status != 0)
-          throw ("Failed to set socket as nonblocking: " + string(strerror(errno)));    
+          throw ("Failed to set socket as nonblocking: " + string(strerror(errno)));
+
+      int flag=1;
+      status = setsockopt(socketfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+      if (status < 0) {
+          cerr << "Failed to disable nagle's algorithm: " + string(strerror(errno)) << endl;
+          throw "Error configuring socket";
+      }
   }
 
 UVBSocket::~UVBSocket()
