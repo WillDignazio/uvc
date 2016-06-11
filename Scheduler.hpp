@@ -39,7 +39,7 @@ private:
 
     const vector<shared_ptr<UVBSocket>> sockets;
     vector<thread*> worker_threads;
-    queue<shared_ptr<ScheduleOp>> op_queue;
+    queue<vector<shared_ptr<ScheduleOp>>*> op_queue;
   
     struct pollfd *poll_fds;
     nfds_t poll_fds_count;
@@ -56,7 +56,7 @@ public:
     ~Scheduler();
 
     /* Scheduling Operations */
-    int schedule(shared_ptr<ScheduleOp> op);
+    int schedule(vector<shared_ptr<ScheduleOp>> *op);
     void suspend();
     void resume();
 

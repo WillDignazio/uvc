@@ -58,7 +58,7 @@ void Scheduler::start()
     cout << "Started scheduler threads." << endl;
 }
 
-int Scheduler::schedule(shared_ptr<ScheduleOp> opptr)
+int Scheduler::schedule(vector<shared_ptr<ScheduleOp>> *opptr)
 {
     unique_lock<mutex> lock(sched_lock);
     op_queue.push(opptr);
@@ -88,26 +88,29 @@ void Scheduler::routine()
         if (op_queue.empty())
             cerr << "Shit it was empty" << endl;
         
-        shared_ptr<ScheduleOp> op = op_queue.front();
-        shared_ptr<UVBSocket> socket = get<2>(*op);
-    
+        vector<shared_ptr<ScheduleOp>> *op_batch = op_queue.front();
         op_queue.pop();
-    
         lock.unlock();
+            
+        for (auto& op : *op_batch) {
+            shared_ptr<UVBSocket> socket = get<2>(*op);
 
-        switch (get<0>(*op)) {
-        case READ:
-            socket->recv_message();
-            get<1>(*op)->events = POLLOUT;
-            continue;
-        case WRITE:
-            socket->emit_payload();
-            get<1>(*op)->events = POLLIN;
-            continue;
-        case SHUTDOWN:
-        default:
-            cerr << "I don't know what to do" << endl;
+            switch (get<0>(*op)) {
+            case READ:
+                socket->recv_message();
+                get<1>(*op)->events = POLLOUT;
+                continue;
+            case WRITE:
+                socket->emit_payload();
+                get<1>(*op)->events = POLLIN;
+                continue;
+            case SHUTDOWN:
+            default:
+                cerr << "I don't know what to do" << endl;
+            }
         }
+
+        delete op_batch; // Make sure to free up finished batch
     }
 }
 
@@ -153,7 +156,7 @@ void Scheduler::event_loop()
         /* ret contains number of events, we don't know where */
         int pcnt = 0;
 
-        unique_lock<mutex> lock(sched_lock);
+        vector<shared_ptr<ScheduleOp>> *op_batch = new vector<shared_ptr<ScheduleOp>>();
         for (unsigned int pidx=0; pidx < poll_fds_count; ++pidx) {
             if (poll_fds[pidx].revents == 0) // No Changes
                 continue;
@@ -161,22 +164,20 @@ void Scheduler::event_loop()
             shared_ptr<ScheduleOp> op = process_event(&poll_fds[pidx],
                                                       sockets.at(pidx));
 
-            lock.unlock();
-
             /* Lop the operation into the scheduler */
-            ret = schedule(op);
-            if (ret != 0) {
-                cerr << "Failed to schedule operation" << endl;
-            }
-      
-            lock.lock();
+            op_batch->push_back(op);
       
             ++pcnt;
             if  (pcnt == ret) // Found all changed sockets
                 break;
         }
 
-        lock.unlock();
+        ret = schedule(op_batch);
+        if (ret != 0) {
+            cerr << "Failed to schedule batch" << endl;
+            break;
+        }
+        
         signal.notify_all();
     }
 }
