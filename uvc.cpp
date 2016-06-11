@@ -33,6 +33,7 @@ static struct argp_option options[] =
         { "port", 'p', "PORT", 0, "Set port for UVB endpoint" },
         { "threads", 't', "THREADS", 0, "Worker thread count, defaults to physical CPU's" },
 	{ "sockets", 's', "SOCKETS", 0, "Number of sockets to open, defaults to 10" },
+        { "spawners", 'w', "SPAWNERS", 0, "Number of spawners that open the socket count" },
         { 0 }
     };
 
@@ -42,6 +43,7 @@ struct arguments
     char const *portstr;
     int nthreads;
     int nsockets;
+    int nspawners;
 };
 
 static error_t
@@ -60,6 +62,10 @@ parse_opt (int key, char *arg, struct argp_state *state)
 
     case 's':
         arguments->nsockets = std::stoi(arg);
+        break;
+
+    case 'w':
+        arguments->nspawners = std::stoi(arg);
         break;
         
     case ARGP_KEY_ARG:
@@ -100,6 +106,7 @@ int main(int argc, char *argv[])
     arguments.portstr = DEFAULT_PORT_STR;
     arguments.nthreads = std::thread::hardware_concurrency();
     arguments.nsockets = 10;
+    arguments.nspawners = 4;
   
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
   
@@ -118,7 +125,7 @@ int main(int argc, char *argv[])
         string portstr{arguments.portstr};
         int nsockets{arguments.nsockets};
         
-        UVBSocketSpawner spawner(10, host, portstr, payload);
+        UVBSocketSpawner spawner(arguments.nspawners, host, portstr, payload);
         
         vector<shared_ptr<UVBSocket>> sockets{spawner.spawn(nsockets)};
         vector<Scheduler*> schedulers{};
