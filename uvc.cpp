@@ -121,9 +121,34 @@ int main(int argc, char *argv[])
         UVBSocketSpawner spawner(10, host, portstr, payload);
         
         vector<shared_ptr<UVBSocket>> sockets{spawner.spawn(nsockets)};
-        Scheduler sched(sockets, arguments.nthreads);
-        sched.start();
+        vector<Scheduler*> schedulers{};
+        
+        unsigned int sched_batch_count = sockets.size() / 1000;
+        if (sched_batch_count == 0)
+            sched_batch_count = 1;
 
+        const auto first = sockets.begin();
+        for (unsigned int idx=0; idx < sched_batch_count; ++idx) {
+            if ((idx + 1) * 1000 > sockets.size()) {
+                vector<shared_ptr<UVBSocket>> final(first, sockets.end());
+
+                Scheduler *sched = new Scheduler(final, arguments.nthreads);
+                sched->start();
+                
+                schedulers.push_back(sched);
+
+                cout << "Spawned last one" << endl;
+                break;
+            }
+
+            vector<shared_ptr<UVBSocket>> subsockets(first, first+1000);
+            Scheduler *sched = new Scheduler(subsockets, arguments.nthreads);
+            sched->start();
+
+            schedulers.push_back(sched);
+            cout << "here" << endl;
+        }
+       
         for (;;) {
             sleep(10);
         }
