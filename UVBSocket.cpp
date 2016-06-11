@@ -3,11 +3,14 @@
 #include <unistd.h>
 #include <cstring>
 #include <fcntl.h>
+
 #include <iostream>
+using std::cerr;
+using std::cout;
+using std::endl;
 
+#include "UVBSocket.hpp"
 #include "uvc.hpp"
-
-using namespace std;
 
 UVBSocket::UVBSocket(const string _host,
 		     const string _portstr,

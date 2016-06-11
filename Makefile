@@ -1,9 +1,13 @@
 CXX=g++
 CXXFLAGS=-ggdb -std=c++11 -Wall -Werror -pthread
 
+CXXHDR= Scheduler.hpp \
+	UVBSocket.hpp \
+	uvc.hpp
+
 CXXSRC= uvc.cpp \
-	sched.cpp \
-	socket.cpp \
+	Scheduler.cpp \
+	UVBSocket.cpp \
 	util.cpp
 
 CXXOBJ= $(CXXSRC:.cpp=.o)
@@ -11,7 +15,7 @@ CXXOBJ= $(CXXSRC:.cpp=.o)
 uvc: $(CXXOBJ)
 	$(CXX) $(CXXFLAGS) -o uvc $(CXXOBJ)
 
-%.o: %.cpp
+%.o: %.cpp $(CXXHDR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:

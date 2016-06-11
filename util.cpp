@@ -5,7 +5,7 @@
 using namespace std;
 
 const char* REQUEST_TEMPLATE =
-  "GET /%s HTTP/1.1\n" \
+  "GET /update/%s HTTP/1.1\n" \
   "Host: %s\n\n";
 
 const string fill_req_template(const string &host, const string &name)

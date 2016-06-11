@@ -7,6 +7,9 @@
 #include <chrono>
 
 #include <poll.h>
+
+#include "Scheduler.hpp"
+#include "UVBSocket.hpp"
 #include "uvc.hpp"
 
 using namespace std;
@@ -91,7 +94,7 @@ int main(int argc, char *argv[])
 
   try {
     vector<shared_ptr<UVBSocket>> sockets;
-    for (int idx=0; idx < 200; ++idx) {
+    for (int idx=0; idx < 1000; ++idx) {
       shared_ptr<UVBSocket> sock = make_shared<UVBSocket>(string(arguments.args[0]),
 							  string(arguments.portstr),
 							  payload);
