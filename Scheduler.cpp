@@ -18,12 +18,10 @@ using std::make_shared;
 
 #include "Scheduler.hpp"
 
-void event_loop(Scheduler *sched);
-void worker_thr(Scheduler *sched);
-
-Scheduler::Scheduler(const vector<shared_ptr<UVBSocket>> _sockets):
-    sockets {_sockets},
-    stopped {false}
+Scheduler::Scheduler(const vector<shared_ptr<UVBSocket>> _sockets, int nthreads)
+    : sockets {_sockets}
+    , stopped {false}
+    , nthreads {nthreads}
 {
     poll_fds = new struct pollfd[sizeof (struct pollfd) * sockets.size()];
     poll_fds_count = sockets.size();
@@ -36,12 +34,6 @@ Scheduler::Scheduler(const vector<shared_ptr<UVBSocket>> _sockets):
             POLLOUT,
             0
         };
-    }
-
-    //  int ncores = thread::hardware_concurrency();
-    for (int ndx=0; ndx < 1; ++ndx) {
-        thread *thr = new thread(worker_thr, this);
-        worker_threads.push_back(thr);
     }
 }
 
@@ -58,11 +50,12 @@ Scheduler::~Scheduler()
         delete[] poll_fds;
 }
 
-thread* Scheduler::start()
+void Scheduler::start()
 {
     /* Last step, begin event loop */
-    event_thread = thread(event_loop, this);
-    return &event_thread;
+    for (int idx=0; idx < nthreads; ++idx)
+        event_threads.push_back(new thread(&Scheduler::routine, this));
+    cout << "Started scheduler threads." << endl;
 }
 
 int Scheduler::schedule(shared_ptr<ScheduleOp> opptr)
@@ -80,24 +73,27 @@ bool Scheduler::is_stopped()
     return stopped;
 }
 
-void worker_thr(Scheduler *sched)
+void Scheduler::routine()
 {
-    while (!sched->is_stopped()) {
+    /* spawn event_loop thread */
+    event_threads.push_back(new thread(&Scheduler::event_loop, this));
+    
+    while (!is_stopped()) {
 
-        if (sched->op_queue.empty()) {
+        if (op_queue.empty()) {
             do {
-                unique_lock<mutex> lock(sched->sched_lock);
-                sched->signal.wait(lock);
-            } while (sched->op_queue.empty());
+                unique_lock<mutex> lock(sched_lock);
+                signal.wait(lock);
+            } while (op_queue.empty());
             /* XXX Fallthrough: Got lock back after signal  */
         }
 
-        unique_lock<mutex> lock(sched->sched_lock);
+        unique_lock<mutex> lock(sched_lock);
     
-        shared_ptr<ScheduleOp> op = sched->op_queue.front();
+        shared_ptr<ScheduleOp> op = op_queue.front();
         shared_ptr<UVBSocket> socket = get<2>(*op);
     
-        sched->op_queue.pop();
+        op_queue.pop();
     
         lock.unlock();
 
@@ -146,10 +142,10 @@ shared_ptr<ScheduleOp> process_event(struct pollfd *pfd, shared_ptr<UVBSocket> s
  * at construction. The events are fed into a event queue, which workers then
  * read from.
  */
-void event_loop(Scheduler *sched)
+void Scheduler::event_loop()
 {
     for (;;) {
-        int ret = poll(sched->poll_fds, sched->poll_fds_count, 100);
+        int ret = poll(poll_fds, poll_fds_count, 100);
         if (ret < 1) {
             if (ret == 0) {
                 cerr << "Timeout on poll..." << endl;
@@ -163,18 +159,18 @@ void event_loop(Scheduler *sched)
         /* ret contains number of events, we don't know where */
         int pcnt = 0;
 
-        unique_lock<mutex> lock(sched->sched_lock);
-        for (unsigned int pidx=0; pidx < sched->poll_fds_count; ++pidx) {
-            if (sched->poll_fds[pidx].revents == 0) // No Changes
+        unique_lock<mutex> lock(sched_lock);
+        for (unsigned int pidx=0; pidx < poll_fds_count; ++pidx) {
+            if (poll_fds[pidx].revents == 0) // No Changes
                 continue;
 
-            shared_ptr<ScheduleOp> op = process_event(&sched->poll_fds[pidx],
-                                                      sched->sockets.at(pidx));
+            shared_ptr<ScheduleOp> op = process_event(&poll_fds[pidx],
+                                                      sockets.at(pidx));
 
             lock.unlock();
 
             /* Lop the operation into the scheduler */
-            ret = sched->schedule(op);
+            ret = schedule(op);
             if (ret != 0) {
                 cerr << "Failed to schedule operation" << endl;
             }
@@ -187,6 +183,6 @@ void event_loop(Scheduler *sched)
         }
 
         lock.unlock();
-        sched->signal.notify_all();
+        signal.notify_all();
     }
 }

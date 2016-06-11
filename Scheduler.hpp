@@ -33,32 +33,37 @@ using std::mutex;
  */
 using ScheduleOp = tuple<opstate, struct pollfd*, shared_ptr<UVBSocket>>;
 class Scheduler
-{ 
-private:  
-  thread event_thread;
-  
-public:
-  const vector<shared_ptr<UVBSocket>> sockets;
-  vector<thread*> worker_threads;
-  queue<shared_ptr<ScheduleOp>> op_queue;
-  
-  struct pollfd *poll_fds;
-  nfds_t poll_fds_count;
+{
+private:
+    vector<thread*> event_threads;
 
-  bool stopped;
-  condition_variable signal;
-  mutex sched_lock; 
+    const vector<shared_ptr<UVBSocket>> sockets;
+    vector<thread*> worker_threads;
+    queue<shared_ptr<ScheduleOp>> op_queue;
   
-  Scheduler(const vector<shared_ptr<UVBSocket>> _sockets);
-  ~Scheduler();
+    struct pollfd *poll_fds;
+    nfds_t poll_fds_count;
 
-  /* Scheduling Operations */
-  int schedule(shared_ptr<ScheduleOp> op);
-  void suspend();
-  void resume();
-  thread* start();
+    bool stopped;
+    condition_variable signal;
+    mutex sched_lock;
+    int nthreads;
 
-  bool is_stopped();
+    void event_loop();
+    
+public: 
+    Scheduler(const vector<shared_ptr<UVBSocket>> _sockets, int nthreads);
+    ~Scheduler();
+
+    /* Scheduling Operations */
+    int schedule(shared_ptr<ScheduleOp> op);
+    void suspend();
+    void resume();
+
+    void routine();
+    void start();
+
+    bool is_stopped();
 };
 
 #endif
