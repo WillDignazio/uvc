@@ -19,6 +19,9 @@ using std::make_shared;
 using std::endl;
 using std::cout;
 
+#include <iomanip>
+using std::setw;
+
 #include "UVBSocketSpawner.hpp"
 #include "UVBSocket.hpp"
 
@@ -54,6 +57,11 @@ vector<shared_ptr<UVBSocket>> UVBSocketSpawner::spawn(int nsockets) const {
                         
                         lock_guard<mutex> guard(lock);
                         sockets.push_back(socket);
+
+                        cout << setw(4) << "\r"
+                             << "Spawning sockets... "
+                             << (current / static_cast<double>(nsockets)) << "%"
+                             << " (" << current  << "/" << nsockets << ")";
                     }
                 }));
     }
@@ -62,6 +70,7 @@ vector<shared_ptr<UVBSocket>> UVBSocketSpawner::spawn(int nsockets) const {
     for (thread& thr : threads)
         thr.join();
 
+    cout << "Finished spawning sockets." << endl;
     return sockets;
 }
 
