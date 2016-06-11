@@ -43,17 +43,15 @@ vector<shared_ptr<UVBSocket>> UVBSocketSpawner::spawn(int nsockets) const {
         
     atomic_int_fast64_t counter{0};
     for (int idx=0; idx < nworkers; ++idx) {
-        cout << "Spawned new worker" << endl;
         threads.push_back(thread([&]() {
                     for (;;) {
                         atomic_int_fast64_t current{counter.fetch_add(1, std::memory_order_relaxed)};
                         if (current >= nsockets) {
-                            cout << "Done." << endl;
                             break;
                         }
 
-                        cout << "Current: " << current << endl;
                         shared_ptr<UVBSocket> socket = spawn();
+                        
                         lock_guard<mutex> guard(lock);
                         sockets.push_back(socket);
                     }

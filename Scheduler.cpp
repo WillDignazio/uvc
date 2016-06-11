@@ -18,7 +18,7 @@ using std::make_shared;
 
 #include "Scheduler.hpp"
 
-Scheduler::Scheduler(const vector<shared_ptr<UVBSocket>> _sockets, int nthreads)
+Scheduler::Scheduler(const vector<shared_ptr<UVBSocket>>& _sockets, int nthreads)
     : sockets {_sockets}
     , stopped {false}
     , nthreads {nthreads}
@@ -60,10 +60,8 @@ void Scheduler::start()
 
 int Scheduler::schedule(shared_ptr<ScheduleOp> opptr)
 {
-    shared_ptr<ScheduleOp> refptr = opptr;
     unique_lock<mutex> lock(sched_lock);
-  
-    op_queue.push(refptr);
+    op_queue.push(opptr);
 
     return 0;
 }
@@ -79,17 +77,17 @@ void Scheduler::routine()
     event_threads.push_back(new thread(&Scheduler::event_loop, this));
     
     while (!is_stopped()) {
-
+        unique_lock<mutex> lock(sched_lock);
         if (op_queue.empty()) {
             do {
-                unique_lock<mutex> lock(sched_lock);
                 signal.wait(lock);
             } while (op_queue.empty());
             /* XXX Fallthrough: Got lock back after signal  */
         }
 
-        unique_lock<mutex> lock(sched_lock);
-    
+        if (op_queue.empty())
+            cerr << "Shit it was empty" << endl;
+        
         shared_ptr<ScheduleOp> op = op_queue.front();
         shared_ptr<UVBSocket> socket = get<2>(*op);
     
@@ -115,8 +113,6 @@ void Scheduler::routine()
 
 shared_ptr<ScheduleOp> process_event(struct pollfd *pfd, shared_ptr<UVBSocket> socket)
 {
-    shared_ptr<UVBSocket> sockptr = socket;
-
     switch (socket->socket_state()) {
     case READ:
     case WRITE:
@@ -126,10 +122,9 @@ shared_ptr<ScheduleOp> process_event(struct pollfd *pfd, shared_ptr<UVBSocket> s
          */
         pfd->events = 0;
         pfd->revents = 0;
-        return make_shared<ScheduleOp>(socket->socket_state(), pfd, sockptr);
+        return make_shared<ScheduleOp>(socket->socket_state(), pfd, socket);
     case SHUTDOWN:
-        cerr << "Shutting down socket..." << endl;
-        return make_shared<ScheduleOp>(SHUTDOWN, pfd, sockptr);
+        return make_shared<ScheduleOp>(SHUTDOWN, pfd, socket);
     default:
         throw "Unknown event operation";
     }

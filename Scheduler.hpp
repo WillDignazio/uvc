@@ -52,7 +52,7 @@ private:
     void event_loop();
     
 public: 
-    Scheduler(const vector<shared_ptr<UVBSocket>> _sockets, int nthreads);
+    Scheduler(const vector<shared_ptr<UVBSocket>>& _sockets, int nthreads);
     ~Scheduler();
 
     /* Scheduling Operations */
