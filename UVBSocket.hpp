@@ -24,7 +24,7 @@ private:
   char *buffer;
   
 public:
-  UVBSocket(const string _host, const string _portstr, const string& _payload);
+  UVBSocket(const string& _host, const string& _portstr, const string& _payload);
   ~UVBSocket();
 	      
   int emit_payload();

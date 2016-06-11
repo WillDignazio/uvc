@@ -148,7 +148,6 @@ void Scheduler::event_loop()
         int ret = poll(poll_fds, poll_fds_count, 100);
         if (ret < 1) {
             if (ret == 0) {
-                cerr << "Timeout on poll..." << endl;
                 continue;
             }
 

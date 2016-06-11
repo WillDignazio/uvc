@@ -31,6 +31,7 @@ static struct argp_option options[] =
     {
         { "port", 'p', "PORT", 0, "Set port for UVB endpoint" },
         { "threads", 't', "THREADS", 0, "Worker thread count, defaults to physical CPU's" },
+	{ "sockets", 's', "SOCKETS", 0, "Number of sockets to open, defaults to 10" },
         { 0 }
     };
 
@@ -39,6 +40,7 @@ struct arguments
     char *args[2];
     char const *portstr;
     int nthreads;
+    int nsockets;
 };
 
 static error_t
@@ -54,7 +56,11 @@ parse_opt (int key, char *arg, struct argp_state *state)
     case 't':
         arguments->nthreads = std::stoi(arg);
         break;
-    
+
+    case 's':
+        arguments->nsockets = std::stoi(arg);
+        break;
+        
     case ARGP_KEY_ARG:
         if (state->arg_num >= ARGC_COUNT) {
             argp_usage(state);
@@ -92,6 +98,7 @@ int main(int argc, char *argv[])
 
     arguments.portstr = DEFAULT_PORT_STR;
     arguments.nthreads = std::thread::hardware_concurrency();
+    arguments.nsockets = 10;
   
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
   
@@ -106,16 +113,18 @@ int main(int argc, char *argv[])
     cout << payload << endl;
 
     try {
-        vector<shared_ptr<UVBSocket>> sockets;
-        for (int idx=0; idx < 10; ++idx) {
-            shared_ptr<UVBSocket> sock = make_shared<UVBSocket>(string(arguments.args[0]),
-                                                                string(arguments.portstr),
-                                                                payload);
-            sockets.push_back(sock);
+        vector<shared_ptr<UVBSocket>> *sockets = new vector<shared_ptr<UVBSocket>>;
+        string host{arguments.args[0]};
+        string portstr{arguments.portstr};
+        
+        for (int idx=0; idx < arguments.nsockets; ++idx) {
+            shared_ptr<UVBSocket> sock = make_shared<UVBSocket>(host, portstr, payload);
+
+            sockets->push_back(sock);
             cout << "Initializing " << idx << endl;
         }
 
-        Scheduler sched(sockets, arguments.nthreads);
+        Scheduler sched(*sockets, arguments.nthreads);
         sched.start();
 
         for (;;) {
