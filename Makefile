@@ -3,11 +3,13 @@ CXXFLAGS=-ggdb -std=c++14 -Wall -Werror -Wpedantic -pthread
 
 CXXHDR= Scheduler.hpp \
 	UVBSocket.hpp \
+	UVBSocketSpawner.hpp \
 	uvc.hpp
 
 CXXSRC= uvc.cpp \
 	Scheduler.cpp \
 	UVBSocket.cpp \
+	UVBSocketSpawner.cpp \
 	util.cpp
 
 CXXOBJ= $(CXXSRC:.cpp=.o)

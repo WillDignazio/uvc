@@ -15,6 +15,7 @@ using std::make_shared;
 
 #include <poll.h>
 
+#include "UVBSocketSpawner.hpp"
 #include "Scheduler.hpp"
 #include "UVBSocket.hpp"
 #include "uvc.hpp"
@@ -113,18 +114,14 @@ int main(int argc, char *argv[])
     cout << payload << endl;
 
     try {
-        vector<shared_ptr<UVBSocket>> *sockets = new vector<shared_ptr<UVBSocket>>;
         string host{arguments.args[0]};
         string portstr{arguments.portstr};
+        int nsockets{arguments.nsockets};
         
-        for (int idx=0; idx < arguments.nsockets; ++idx) {
-            shared_ptr<UVBSocket> sock = make_shared<UVBSocket>(host, portstr, payload);
-
-            sockets->push_back(sock);
-            cout << "Initializing " << idx << endl;
-        }
-
-        Scheduler sched(*sockets, arguments.nthreads);
+        UVBSocketSpawner spawner(10, host, portstr, payload);
+        
+        vector<shared_ptr<UVBSocket>> sockets{spawner.spawn(nsockets)};
+        Scheduler sched(sockets, arguments.nthreads);
         sched.start();
 
         for (;;) {
