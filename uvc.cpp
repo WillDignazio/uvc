@@ -139,7 +139,11 @@ int main(int argc, char *argv[])
             if ((idx + 1) * 1000 > sockets.size()) {
                 vector<shared_ptr<UVBSocket>> final(first, sockets.end());
 
-                Scheduler *sched = new Scheduler(final, arguments.nthreads);
+                int nthreads = arguments.nthreads / sched_batch_count;
+                if (nthreads == 0)
+                    nthreads = 1;
+                
+                Scheduler *sched = new Scheduler(final, nthreads);
                 sched->start();
                 
                 schedulers.push_back(sched);
