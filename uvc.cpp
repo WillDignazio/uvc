@@ -20,6 +20,10 @@ using std::make_shared;
 #include "UVBSocket.hpp"
 #include "uvc.hpp"
 
+/* Global Variables */
+vector<shared_ptr<UVBSocket>> sockets;
+
+/* Documentaiton */
 char const *DEFAULT_PORT_STR = "80";
 const int ARGC_COUNT = 2;
 const char *uvc_program_version		= "uvc v0.1";
@@ -127,7 +131,7 @@ int main(int argc, char *argv[])
         
         UVBSocketSpawner spawner(arguments.nspawners, host, portstr, payload);
         
-        vector<shared_ptr<UVBSocket>> sockets{spawner.spawn(nsockets)};
+        sockets = vector<shared_ptr<UVBSocket>>{spawner.spawn(nsockets)};
         vector<Scheduler*> schedulers{};
         
         unsigned int sched_batch_count = sockets.size() / 1000;
@@ -142,7 +146,8 @@ int main(int argc, char *argv[])
                 int nthreads = arguments.nthreads / sched_batch_count;
                 if (nthreads == 0)
                     nthreads = 1;
-                
+
+                cout << "Starting Scheduler with " << nthreads << " threads" << endl;
                 Scheduler *sched = new Scheduler(final, nthreads);
                 sched->start();
                 
@@ -161,7 +166,7 @@ int main(int argc, char *argv[])
         }
        
         for (;;) {
-            sleep(10);
+            sleep(10000);
         }
     
     } catch (const exception &exc) {

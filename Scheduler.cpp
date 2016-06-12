@@ -31,7 +31,7 @@ Scheduler::Scheduler(const vector<shared_ptr<UVBSocket>>& _sockets, int nthreads
         int socketfd = (*si)->socket_fd();
         poll_fds[si - sockets.begin()] = {
             socketfd,
-            POLLOUT,
+            POLLOUT|POLLWRBAND,
             0
         };
     }
@@ -98,11 +98,11 @@ void Scheduler::routine()
             switch (get<0>(*op)) {
             case READ:
                 socket->recv_message();
-                get<1>(*op)->events = POLLOUT;
+                get<1>(*op)->events = POLLOUT|POLLWRBAND;
                 continue;
             case WRITE:
                 socket->emit_payload();
-                get<1>(*op)->events = POLLIN;
+                get<1>(*op)->events = POLLIN|POLLRDNORM|POLLPRI;
                 continue;
             case SHUTDOWN:
             default:
@@ -143,7 +143,7 @@ shared_ptr<ScheduleOp> process_event(struct pollfd *pfd, shared_ptr<UVBSocket> s
 void Scheduler::event_loop()
 {
     for (;;) {
-        int ret = poll(poll_fds, poll_fds_count, 1000);
+        int ret = poll(poll_fds, poll_fds_count, 500);
         if (ret < 1) {
             if (ret == 0) {
                 continue;
