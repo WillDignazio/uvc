@@ -17,7 +17,7 @@ const string fill_req_template(const string &host, const string &name)
   snprintf(buffer, bufsize, REQUEST_TEMPLATE, name.c_str(), host.c_str());
 
   string out(buffer);
-  delete buffer;
+  delete[] buffer;
 
   return out;
 }

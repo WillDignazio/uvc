@@ -143,7 +143,7 @@ shared_ptr<ScheduleOp> process_event(struct pollfd *pfd, shared_ptr<UVBSocket> s
 void Scheduler::event_loop()
 {
     for (;;) {
-        int ret = poll(poll_fds, poll_fds_count, 100);
+        int ret = poll(poll_fds, poll_fds_count, 10);
         if (ret < 1) {
             if (ret == 0) {
                 continue;

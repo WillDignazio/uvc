@@ -13,7 +13,11 @@ using std::exception;
 #include <memory>
 using std::make_shared;
 
+#include <string>
+using std::stoi;
+
 #include <poll.h>
+#include <signal.h>
 
 #include "UVBSocketSpawner.hpp"
 #include "Scheduler.hpp"
@@ -61,21 +65,21 @@ parse_opt (int key, char *arg, struct argp_state *state)
         break;
 
     case 't':
-        arguments->nthreads = std::stoi(arg);
+        arguments->nthreads = stoi(arg);
         break;
 
     case 's':
-        arguments->nsockets = std::stoi(arg);
+        arguments->nsockets = stoi(arg);
         break;
 
     case 'w':
-        arguments->nspawners = std::stoi(arg);
+        arguments->nspawners = stoi(arg);
         break;
         
     case ARGP_KEY_ARG:
         if (state->arg_num >= ARGC_COUNT) {
             argp_usage(state);
-            exit(1);
+            return 1;
         }
 
         arguments->args[state->arg_num]= arg;
@@ -84,7 +88,7 @@ parse_opt (int key, char *arg, struct argp_state *state)
     case ARGP_KEY_END:
         if (state->arg_num < ARGC_COUNT) {
             argp_usage(state);
-            exit(1);
+            return 1;
         }
         break;
 
@@ -100,6 +104,10 @@ static struct argp argp = {
     args_doc,
     doc
 };
+
+void sigpipe_handler(int signum) {
+    cout << "Got " << signum << endl;
+}
 
 int main(int argc, char *argv[])
 {
@@ -124,6 +132,8 @@ int main(int argc, char *argv[])
     cout << "Payload:" << endl;
     cout << payload << endl;
 
+    signal(SIGPIPE, sigpipe_handler);
+    
     try {
         string host{arguments.args[0]};
         string portstr{arguments.portstr};
@@ -133,7 +143,7 @@ int main(int argc, char *argv[])
         
         sockets = vector<shared_ptr<UVBSocket>>{spawner.spawn(nsockets)};
         vector<Scheduler*> schedulers{};
-        
+
         Scheduler *sched = new Scheduler(sockets, arguments.nthreads);
         sched->start();
         

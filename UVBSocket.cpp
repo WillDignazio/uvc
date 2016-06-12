@@ -15,12 +15,13 @@ using std::endl;
 
 UVBSocket::UVBSocket(const string& _host,
 		     const string& _portstr,
-		     const string& _payload):
-    host {_host},
-    portstr {_portstr},
-    payload {_payload},
-    state {WRITE},
-    buffer {new char[_payload.size()]}
+		     const string& _payload)
+    : host {_host}
+    , portstr {_portstr}
+    , payload {_payload}
+    , state {WRITE}
+    , buffer {new char[_payload.size()]}
+    , buffersz {_payload.size()}
   {
       memset(&host_info_in, 0, sizeof host_info_in);
       host_info_in.ai_family = AF_UNSPEC;
@@ -75,7 +76,7 @@ UVBSocket::~UVBSocket()
     if (host_info_ret != NULL)
         free(host_info_ret);
 
-    delete buffer;
+    delete[] buffer;
     cout << "Closed UVBSocket" << endl;
 }
 
@@ -92,13 +93,13 @@ opstate UVBSocket::socket_state()
 int UVBSocket::emit_payload()
 {
     state = READ;
-    return send(socketfd, payload.c_str(), payload.length(), 0);
+    int i = 1;
+    setsockopt(socketfd, IPPROTO_TCP, TCP_QUICKACK, (void *)&i, sizeof(i));    
+    return send(socketfd, payload.c_str(), payload.length(), MSG_EOR);
 }
 
 int UVBSocket::recv_message()
 {
     state = WRITE;
-    int i = 1;
-    setsockopt(socketfd, IPPROTO_TCP, TCP_QUICKACK, (void *)&i, sizeof(i));
-    return recv(socketfd, buffer, payload.size(), 0);
+    return recv(socketfd, buffer, buffersz, 0);
 }

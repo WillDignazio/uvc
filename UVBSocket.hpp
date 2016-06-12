@@ -11,27 +11,28 @@ using std::string;
 class UVBSocket
 {
 private:
-  const string host;
-  const string portstr;
-  const string& payload;
+    const string host;
+    const string portstr;
+    const string& payload;
 
-  struct addrinfo host_info_in;
-  struct addrinfo *host_info_ret;  
-  int socketfd;
-  opstate state;
+    struct addrinfo host_info_in;
+    struct addrinfo *host_info_ret;  
+    int socketfd;
+    opstate state;
 
-  /* TODO: remove or share */
-  char *buffer;
+    /* TODO: remove or share */
+    char *buffer;
+    long unsigned int buffersz;
   
-public:
-  UVBSocket(const string& _host, const string& _portstr, const string& _payload);
-  ~UVBSocket();
+    public:
+    UVBSocket(const string& _host, const string& _portstr, const string& _payload);
+    ~UVBSocket();
 	      
-  int emit_payload();
-  int recv_message();
+    int emit_payload();
+    int recv_message();
 
-  int socket_fd();
-  opstate socket_state();
+    int socket_fd();
+    opstate socket_state();
 };
 
 #endif

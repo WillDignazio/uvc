@@ -1,5 +1,5 @@
-CXX=g++
-CXXFLAGS=-ggdb -std=c++14 -Wall -Werror -Wpedantic -pthread
+CXX=clang++
+CXXFLAGS=-O3 -std=c++14 -Wall -Werror -Wpedantic -pthread
 
 CXXHDR= Scheduler.hpp \
 	UVBSocket.hpp \
