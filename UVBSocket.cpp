@@ -20,7 +20,7 @@ UVBSocket::UVBSocket(const string& _host,
     portstr {_portstr},
     payload {_payload},
     state {WRITE},
-    buffer {new char[100]}
+    buffer {new char[_payload.size()]}
   {
       memset(&host_info_in, 0, sizeof host_info_in);
       host_info_in.ai_family = AF_UNSPEC;
@@ -98,5 +98,7 @@ int UVBSocket::emit_payload()
 int UVBSocket::recv_message()
 {
     state = WRITE;
-    return recv(socketfd, buffer, 100, 0);
+    int i = 1;
+    setsockopt(socketfd, IPPROTO_TCP, TCP_QUICKACK, (void *)&i, sizeof(i));
+    return recv(socketfd, buffer, payload.size(), 0);
 }
