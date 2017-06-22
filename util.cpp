@@ -21,3 +21,4 @@ const string fill_req_template(const string &host, const string &name)
 
   return out;
 }
+
